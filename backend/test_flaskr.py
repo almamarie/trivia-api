@@ -38,11 +38,16 @@ class TriviaTestCase(unittest.TestCase):
     # ====================================================================================
     # Tests for Categories
     # ====================================================================================
-
+    # successful operation
     def test_get_all_categories(self):
         res = self.client().get("/categories")
         data = json.loads(res.data)
 
-        # Make the tests conveniently executable
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data["success"], True)
+        self.assertTrue(data["categories"])
+
+
+    # Make the tests conveniently executable
 if __name__ == "__main__":
     unittest.main()
