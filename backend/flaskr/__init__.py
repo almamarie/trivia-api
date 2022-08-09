@@ -1,3 +1,4 @@
+from crypt import methods
 import os
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
@@ -8,26 +9,44 @@ from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 10
 
+
 def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
     setup_db(app)
+    CORS(app, resources={r"/api/": {"origins": "*"}})
 
-    """
-    @TODO: Set up CORS. Allow '*' for origins. Delete the sample route after completing the TODOs
-    """
+    @app.after_request
+    def after_request(response):
+        response.headers.add(
+            "Access-Control-Allow-Headers", "Content-Type,Authorization,true"
+        )
 
-    """
-    @TODO: Use the after_request decorator to set Access-Control-Allow
-    """
+        response.headers.add(
+            "Access-Control-Allow-Methods", "GET,POST,DELETE"
+        )
+
+        return response
 
     """
     @TODO:
     Create an endpoint to handle GET requests
     for all available categories.
     """
+    @app.route("/categories", methods=['GET'])
+    def get_all_categories():
+        all_categories = Category.query.order_by(Category.id).all()
+        print("All Categories: ", all_categories)
 
-
+        print(all_categories)
+        # The number of categories are few so there is no need to paginate them.
+        categories = {}
+        for category in all_categories:
+            categories[category.id] = category.type
+        return jsonify({
+            'success': True,
+            'categories': categories
+        })
     """
     @TODO:
     Create an endpoint to handle GET requests for questions,
@@ -99,4 +118,3 @@ def create_app(test_config=None):
     """
 
     return app
-
