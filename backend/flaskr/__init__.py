@@ -1,5 +1,6 @@
 from crypt import methods
 import os
+from urllib import response
 from flask import Flask, request, abort, jsonify
 from flask_sqlalchemy import SQLAlchemy
 from flask_cors import CORS
@@ -8,6 +9,31 @@ import random
 from models import setup_db, Question, Category
 
 QUESTIONS_PER_PAGE = 10
+
+
+def paginateQuestions(request, allQuestions):
+    page = request.args.get("page", 1, type=int)
+    # print("page: ", page)
+    start = (page - 1) * QUESTIONS_PER_PAGE
+    end = start + QUESTIONS_PER_PAGE
+
+    formatedQuestions = [question.format() for question in allQuestions]
+
+    # print("start, end: ", start, end)
+    return formatedQuestions[start:end]
+
+
+# this function is called a lot of times so it is necessary to make it stand alone
+def generate_categories():
+    all_categories = Category.query.order_by(Category.id).all()
+    # print("All Categories: ", all_categories)
+
+    # The number of categories are few so there is no need to paginate them.
+    categories = {}
+    for category in all_categories:
+        categories[category.id] = category.type
+
+    return categories
 
 
 def create_app(test_config=None):
@@ -29,26 +55,19 @@ def create_app(test_config=None):
         return response
 
     """
-    @TODO:
     Create an endpoint to handle GET requests
     for all available categories.
     """
+
     @app.route("/categories", methods=['GET'])
     def get_all_categories():
-        all_categories = Category.query.order_by(Category.id).all()
-        print("All Categories: ", all_categories)
-
-        print(all_categories)
-        # The number of categories are few so there is no need to paginate them.
-        categories = {}
-        for category in all_categories:
-            categories[category.id] = category.type
+        categories = generate_categories()
+        # print(categories)
         return jsonify({
             'success': True,
             'categories': categories
         })
     """
-    @TODO:
     Create an endpoint to handle GET requests for questions,
     including pagination (every 10 questions).
     This endpoint should return a list of questions,
@@ -60,6 +79,55 @@ def create_app(test_config=None):
     Clicking on the page numbers should update the questions.
     """
 
+    @app.route("/questions", methods=["GET"])
+    def get_paginated_books():
+        allQuestions = Question.query.order_by(Question.category).all()
+        currentQuestions = paginateQuestions(request, allQuestions)
+
+        if len(currentQuestions) == 0:
+            abort(404)
+
+        categories = generate_categories()
+
+        # print("jiberrish", categories[currentQuestions[0]['category']])
+        # print("\n\nCurrent Category: ", categories)
+        # generate the current category
+        currentCategory = categories[currentQuestions[0]['category']]
+
+        # print(currentCategory)
+        return jsonify({
+            'success': True,
+            'questions': currentQuestions,
+            'totalQuestions': len(currentQuestions),
+            'categories': categories,
+            'currentCategory': currentCategory
+        })
+
+    # get books from a particular id
+    @app.route("/categories/<int:category_id>/questions", methods=["GET"])
+    def get_paginated_books_by_categories(category_id):
+        # generate the current category
+        currentCategory = Category.query.filter(
+            Category.id == category_id).with_entities(Category.type).one_or_none()
+
+        if currentCategory is None:
+            abort(404)
+
+        allQuestions = Question.query.filter(
+            Question.category == category_id).order_by(Question.category).all()
+        currentQuestions = paginateQuestions(request, allQuestions)
+
+        if len(currentQuestions) == 0:
+            abort(404)
+
+        # print(currentCategory)
+        return jsonify({
+            'success': True,
+            'questions': currentQuestions,
+            'totalQuestions': len(currentQuestions),
+            'currentCategory': currentCategory[0]
+        })
+
     """
     @TODO:
     Create an endpoint to DELETE question using a question ID.
@@ -68,6 +136,21 @@ def create_app(test_config=None):
     This removal will persist in the database and when you refresh the page.
     """
 
+    @app.route("/questions/<int:question_id>", methods=['DELETE'])
+    def delete_question(question_id):
+        try:
+            question = Question.query.filter(
+                Question.id == question_id).one_or_none()
+            if question is None:
+                abort(404)
+
+            question.delete()
+            return jsonify({
+                'success': True,
+                'id': question_id
+            })
+        except:
+            abort(422)
     """
     @TODO:
     Create an endpoint to POST a new question,
@@ -78,6 +161,49 @@ def create_app(test_config=None):
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
     """
+
+    @app.route("/questions")
+    def add_new_question():
+        body = request.get_json()
+
+        # chech each field to be sure if it not null and
+        # send a 460 error code (looked through the error codes at
+        # developer.mozilla.org and chose one that is not used)
+        new_question = body.get("question", None)
+        if new_question is None:
+            abort(422)
+
+        new_answer = body.get("answer", None)
+        if new_answer is None:
+            abort(422)
+
+        new_difficulty = body.get("difficulty", None)
+        if new_difficulty is None:
+            abort(422)
+
+        new_category = body.get("category", None)
+        if new_category is None:
+            abort(422)
+
+        if Question.query.filter(Question.question == new_question).one_ornone() != None:
+            abort(422)
+
+        try:
+            newQuestion = Question(
+                question=new_question,
+                answer=new_answer,
+                difficulty=new_difficulty,
+                category=new_category
+            )
+
+            newQuestion.insert
+
+            return jsonify({
+                'success': True,
+            })
+
+        except:
+            abort(422)
 
     """
     @TODO:
@@ -117,4 +243,48 @@ def create_app(test_config=None):
     including 404 and 422.
     """
 
+    @app.errorhandler(404)
+    def not_found(error):
+        return (
+            jsonify({"success": False, "error": 404,
+                    "message": "resource not found"}),
+            404,
+        )
+
+    @app.errorhandler(422)
+    def unprocessable(error):
+        return (
+            jsonify({"success": False, "error": 422,
+                    "message": "unprocessable"}),
+            422,
+        )
+
+    @app.errorhandler(400)
+    def bad_request(error):
+        return jsonify({"success": False, "error": 400, "message": "bad request"}), 400
+
+    @app.errorhandler(405)
+    def not_found(error):
+        return (
+            jsonify({"success": False, "error": 405,
+                    "message": "method not allowed"}),
+            405,
+        )
+
+# Tried creating new status codes but got errors
+    # @app.errorhandler(460)
+    # def incomplete_data(error):
+    #     return (
+    #         jsonify({"success": False, "error": 460,
+    #                 "message": "provided incomplete data"}),
+    #         460,
+    #     )
+
+    # @app.errorhandler(461)
+    # def incomplete_data(error):
+    #     return (
+    #         jsonify({"success": False, "error": 461,
+    #                 "message": "Question already in database"}),
+    #         461,
+    #     )
     return app
