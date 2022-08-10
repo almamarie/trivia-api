@@ -40,7 +40,7 @@ class TriviaTestCase(unittest.TestCase):
     """
 
     # ====================================================================================
-    # Tests for Categories
+    # Tests for /categories
     # ====================================================================================
     # successful operation
     def test_get_all_categories(self):
@@ -50,6 +50,38 @@ class TriviaTestCase(unittest.TestCase):
         self.assertEqual(res.status_code, 200)
         self.assertEqual(data["success"], True)
         self.assertTrue(data["categories"])
+
+    # ====================================================================================
+    # Tests for /questions?page=${integer}
+    # ====================================================================================
+    # successful operation
+
+    def test_get_paginated_questions(self):
+        res = self.client().get("/questions?page=1")
+        data = json.loads(res.data)
+
+        # confirm the presence od all necessary keys and their values
+        self.assertEqual(res.status_code, 200)
+        self.assertEqual(data["success"], True)
+        self.assertTrue(data['totalQuestions'])
+        self.assertTrue(data['questions'])
+        self.assertTrue(data['categories'])
+        self.assertTrue(data['currentCategory'])
+
+        # confirm that total number of questions are valid
+        totalLength = Question.query.count()
+        self.assertEqual(len(data['totalQuestions']), totalLength)
+        self.assertEqual(len(data['questions']), data['totalQuestions'])
+
+    # requesting beyond valid page number
+
+    def test_404_sent_requesting_beyond_valid_page(self):
+        res = self.client().get("/questions?page=10000")
+        data = json.loads(res.data)
+
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data['success'], False)
+        self.assertEqual(data['message'], 'invalid page number requested')
 
     # Make the tests conveniently executable
 if __name__ == "__main__":
