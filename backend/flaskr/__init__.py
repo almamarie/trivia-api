@@ -1,4 +1,5 @@
 from crypt import methods
+from distutils.log import error
 import json
 import os
 from urllib import response
@@ -192,48 +193,69 @@ def create_app(test_config=None):
     """
 
     @app.route("/questions", methods=["POST"])
-    def add_new_question():
-        body = request.get_json()
+    def add_new_question_and_search():
+        try:
+            body = request.get_json()
+            print("Body of search:", body)
+            search = body.get("searchTerm", None)
+            print('search: ', search)
+            print("testing search: ", search == None)
+            if search != None:
+                matchingQuestions = Question.query.filter(
+                    Question.question.ilike("%{}%".format(search))).all()
+                if len(matchingQuestions) == 0:
+                    abort(404)
 
-        search = body.get("searchTerm", None)
+                finalQuestions = [question.format()
+                                  for question in matchingQuestions]
+                print("Final Questions: ", finalQuestions)
+                return jsonify({
+                    'success': True,
+                    'questions': finalQuestions,
+                    'totalQuestions': len(finalQuestions),
+                    'currentCategory': finalQuestions[0]['category']
+                })
 
-        # check each field to be sure if it not null and
-        # send a 460 error code (looked through the error codes at
-        # developer.mozilla.org and chose one that is not used)
-        new_question = body.get("question", None)
-        # print(new_question)
-        if new_question is None:
-            abort(422)
+            else:
+                # check each field to be sure if it not null and
+                # send a 460 error code (looked through the error codes at
+                # developer.mozilla.org and chose one that is not used)
+                new_question = body.get("question", None)
+                print(new_question)
+                if new_question is None:
+                    abort(404)
 
-        new_answer = body.get("answer", None)
-        if new_answer is None:
-            abort(422)
+                new_answer = body.get("answer", None)
+                if new_answer is None:
+                    abort(404)
 
-        new_difficulty = body.get("difficulty", None)
-        if new_difficulty is None:
-            abort(422)
+                new_difficulty = body.get("difficulty", None)
+                if new_difficulty is None:
+                    abort(404)
 
-        new_category = body.get("category", None)
-        if new_category is None:
-            abort(422)
+                new_category = body.get("category", None)
+                if new_category is None:
+                    abort(404)
 
-        if Question.query.filter(Question.question == new_question).one_or_none() != None:
-            abort(422)
+                if Question.query.filter(Question.question == new_question).one_or_none() != None:
+                    abort(404)
 
-        newQuestion = Question(
-            question=new_question,
-            answer=new_answer,
-            difficulty=new_difficulty,
-            category=new_category
-        )
+                newQuestion = Question(
+                    question=new_question,
+                    answer=new_answer,
+                    difficulty=new_difficulty,
+                    category=new_category
+                )
 
-        # print(newQuestion.format())
-        newQuestion.insert()
+                # print(newQuestion.format())
+                newQuestion.insert()
 
-        return jsonify({
-            'success': True,
-        })
-
+                return jsonify({
+                    'success': True,
+                })
+        except (RuntimeError, TypeError, NameError) as error:
+            print("Exception Error:", error)
+            abort(404)
     """
     @TODO:
     Create a POST endpoint to get questions to play the quiz.

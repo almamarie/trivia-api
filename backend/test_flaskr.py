@@ -203,7 +203,7 @@ class TriviaTestCase(unittest.TestCase):
     # ====================================================================================
     # successful operation
     def test_search(self):
-        res = self.client().get("/questions", json={"searchTerm": "ancient"})
+        res = self.client().post("/questions", json={"searchTerm": "ancient"})
 
         data = json.loads(res.data)
         # print("\nancient: ", data, "\n")
@@ -215,14 +215,12 @@ class TriviaTestCase(unittest.TestCase):
 
     # # unsuccessful operation
     def test_search_empty_results(self):
-        res = self.client().get("/questions",
-                                json={"searchTerm": "cbaucvvbvue;89764777736375quvevccquecbecue785387e5127e128e1e7521e"})
+        res = self.client().post("/questions",
+                                 json={"searchTerm": "cbaucvvbvue;89764777736375quvevccquecbecue785387e5127e128e1e7521e"})
         data = json.loads(res.data)
         # print("search: ", data)
-        self.assertEqual(res.status_code, 200)
-        self.assertEqual(data["success"], True)
-        self.assertEqual(data['totalQuestions'], 0)
-        self.assertTrue(len(data['questions']), 0)
+        self.assertEqual(res.status_code, 404)
+        self.assertEqual(data["success"], False)
 
     # ====================================================================================
     # get questions to play
@@ -232,7 +230,10 @@ class TriviaTestCase(unittest.TestCase):
     def test_quizzes(self):
         sendData = {
             'previous_questions': [1, 4, 20, 15],
-            'quiz_category': 'Arts'
+            'quiz_category': {
+                'type': 'Arts',
+                'id': 1
+            }
         }
         res = self.client().post("/quizzes", json=sendData)
 
@@ -246,7 +247,10 @@ class TriviaTestCase(unittest.TestCase):
     # successful test
     def test_400_missing_request_data_quizzes(self):
         sendData = {
-            'quiz_category': 'Arts'
+            'quiz_category': {
+                'type': 'Arts',
+                'id': 1
+            }
         }
         res = self.client().post("/quizzes", json=sendData)
 
