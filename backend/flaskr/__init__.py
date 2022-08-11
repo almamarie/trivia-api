@@ -45,7 +45,7 @@ def create_app(test_config=None):
     # create and configure the app
     app = Flask(__name__)
     setup_db(app)
-    CORS(app, resources={r"/api/": {"origins": "*"}})
+    CORS(app, resources={r"/api/": {"origins": "http://localhost:3000"}})
 
     @app.after_request
     def after_request(response):
@@ -55,6 +55,14 @@ def create_app(test_config=None):
 
         response.headers.add(
             "Access-Control-Allow-Methods", "GET,POST,DELETE"
+        )
+
+        response.headers.add(
+            'Access-Control-Allow-Origin', 'http://localhost:3000'
+        )
+
+        response.headers.add(
+            'Access-Control-Allow-Credentials', 'true'
         )
 
         return response
@@ -186,62 +194,45 @@ def create_app(test_config=None):
     @app.route("/questions", methods=["POST"])
     def add_new_question():
         body = request.get_json()
+
         search = body.get("searchTerm", None)
-        try:
-            if search != None:
-                match = Question.query.filter(
-                    Question.question.ilike("%{}%".format(search)))
 
-                formatedQuestions = formatQuestions(match)
-
-                categories = generate_categories()
-
-                currentCategory = categories[formatedQuestions[0]['category']]
-                return jsonify({
-                    'success': True,
-                    'questions': formatedQuestions,
-                    'totalQuestions': len(formatedQuestions),
-                    'currentCategory': currentCategory
-                })
-
-            else:
-                # chech each field to be sure if it not null and
-                # send a 460 error code (looked through the error codes at
-                # developer.mozilla.org and chose one that is not used)
-                new_question = body.get("question", None)
-                if new_question is None:
-                    abort(422)
-
-                new_answer = body.get("answer", None)
-                if new_answer is None:
-                    abort(422)
-
-                new_difficulty = body.get("difficulty", None)
-                if new_difficulty is None:
-                    abort(422)
-
-                new_category = body.get("category", None)
-                if new_category is None:
-                    abort(422)
-
-                if Question.query.filter(Question.question == new_question).one_or_none() != None:
-                    abort(422)
-
-                newQuestion = Question(
-                    question=new_question,
-                    answer=new_answer,
-                    difficulty=new_difficulty,
-                    category=new_category
-                )
-
-                newQuestion.insert
-
-                return jsonify({
-                    'success': True,
-                })
-
-        except:
+        # check each field to be sure if it not null and
+        # send a 460 error code (looked through the error codes at
+        # developer.mozilla.org and chose one that is not used)
+        new_question = body.get("question", None)
+        # print(new_question)
+        if new_question is None:
             abort(422)
+
+        new_answer = body.get("answer", None)
+        if new_answer is None:
+            abort(422)
+
+        new_difficulty = body.get("difficulty", None)
+        if new_difficulty is None:
+            abort(422)
+
+        new_category = body.get("category", None)
+        if new_category is None:
+            abort(422)
+
+        if Question.query.filter(Question.question == new_question).one_or_none() != None:
+            abort(422)
+
+        newQuestion = Question(
+            question=new_question,
+            answer=new_answer,
+            difficulty=new_difficulty,
+            category=new_category
+        )
+
+        # print(newQuestion.format())
+        newQuestion.insert()
+
+        return jsonify({
+            'success': True,
+        })
 
     """
     @TODO:
@@ -254,7 +245,7 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not.
     """
-    @app.route("/quizzes", methods=['GET'])
+    @app.route("/quizzes", methods=['POST'])
     def get_question_for_quiz():
 
         body = request.get_json()
@@ -264,18 +255,29 @@ def create_app(test_config=None):
             abort(400)
 
         quiz_category = body.get("quiz_category", None)
-        # print("\Quiz category: ", quiz_category)
+        # print("\Quiz category: ", quiz_category)                             the way the front end sends their data for quiz_category is different from the way you do yours. fix your test code.
         if quiz_category is None:
             abort(400)
 
-        category_id = Category.query.filter(Category.type == quiz_category)
-        if category_id is None:
+        print(quiz_category)
+
+        categoryId = quiz_category['id']
+        if categoryId is None:
             abort(400)
+        # category_id = quiz_category.id
+        # print("\n\n\ncategory ID:", category_id)
+        # category_id = Category.query.filter(
+        #     Category.type == quiz_category).one_or_none()
+        # if category_id is None:
+        #     abort(400)
+        # print("category ID:", category_id)
 
-        nextQuestion = Question.query.filter(
-            ~Question.id.in_(previousQuestions)).first()
+        # nextQuestion = Question.query.filter(
+        #     ~Question.id.in_(previousQuestions)).first()
 
-        # print("next question: ", nextQuestion.format())
+        nextQuestion = Question.query.filter(~Question.id.in_(
+            previousQuestions), Question.category == categoryId).first()
+
         if nextQuestion == None:
             return jsonify({
                 'success': False,
