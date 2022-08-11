@@ -1,4 +1,5 @@
 from crypt import methods
+import json
 import os
 from urllib import response
 from flask import Flask, request, abort, jsonify
@@ -11,13 +12,17 @@ from models import setup_db, Question, Category
 QUESTIONS_PER_PAGE = 10
 
 
+def formatQuestions(questions):
+    return [question.format() for question in questions]
+
+
 def paginateQuestions(request, allQuestions):
     page = request.args.get("page", 1, type=int)
     # print("page: ", page)
     start = (page - 1) * QUESTIONS_PER_PAGE
     end = start + QUESTIONS_PER_PAGE
 
-    formatedQuestions = [question.format() for question in allQuestions]
+    formatedQuestions = formatQuestions(allQuestions)
 
     # print("start, end: ", start, end)
     return formatedQuestions[start:end]
@@ -103,6 +108,14 @@ def create_app(test_config=None):
             'currentCategory': currentCategory
         })
 
+    """
+    Create a GET endpoint to get questions based on category.
+
+    TEST: In the "List" tab / main screen, clicking on one of the
+    categories in the left column will cause only questions of that
+    category to be shown.
+    """
+
     # get books from a particular id
     @app.route("/categories/<int:category_id>/questions", methods=["GET"])
     def get_paginated_books_by_categories(category_id):
@@ -129,7 +142,6 @@ def create_app(test_config=None):
         })
 
     """
-    @TODO:
     Create an endpoint to DELETE question using a question ID.
 
     TEST: When you click the trash icon next to a question, the question will be removed.
@@ -152,7 +164,7 @@ def create_app(test_config=None):
         except:
             abort(422)
     """
-    @TODO:
+
     Create an endpoint to POST a new question,
     which will require the question and answer text,
     category, and difficulty score.
@@ -160,53 +172,8 @@ def create_app(test_config=None):
     TEST: When you submit a question on the "Add" tab,
     the form will clear and the question will appear at the end of the last page
     of the questions list in the "List" tab.
-    """
 
-    @app.route("/questions")
-    def add_new_question():
-        body = request.get_json()
 
-        # chech each field to be sure if it not null and
-        # send a 460 error code (looked through the error codes at
-        # developer.mozilla.org and chose one that is not used)
-        new_question = body.get("question", None)
-        if new_question is None:
-            abort(422)
-
-        new_answer = body.get("answer", None)
-        if new_answer is None:
-            abort(422)
-
-        new_difficulty = body.get("difficulty", None)
-        if new_difficulty is None:
-            abort(422)
-
-        new_category = body.get("category", None)
-        if new_category is None:
-            abort(422)
-
-        if Question.query.filter(Question.question == new_question).one_ornone() != None:
-            abort(422)
-
-        try:
-            newQuestion = Question(
-                question=new_question,
-                answer=new_answer,
-                difficulty=new_difficulty,
-                category=new_category
-            )
-
-            newQuestion.insert
-
-            return jsonify({
-                'success': True,
-            })
-
-        except:
-            abort(422)
-
-    """
-    @TODO:
     Create a POST endpoint to get questions based on a search term.
     It should return any questions for whom the search term
     is a substring of the question.
@@ -216,14 +183,65 @@ def create_app(test_config=None):
     Try using the word "title" to start.
     """
 
-    """
-    @TODO:
-    Create a GET endpoint to get questions based on category.
+    @app.route("/questions", methods=["POST"])
+    def add_new_question():
+        body = request.get_json()
+        search = body.get("searchTerm", None)
+        try:
+            if search != None:
+                match = Question.query.filter(
+                    Question.question.ilike("%{}%".format(search)))
 
-    TEST: In the "List" tab / main screen, clicking on one of the
-    categories in the left column will cause only questions of that
-    category to be shown.
-    """
+                formatedQuestions = formatQuestions(match)
+
+                categories = generate_categories()
+
+                currentCategory = categories[formatedQuestions[0]['category']]
+                return jsonify({
+                    'success': True,
+                    'questions': formatedQuestions,
+                    'totalQuestions': len(formatedQuestions),
+                    'currentCategory': currentCategory
+                })
+
+            else:
+                # chech each field to be sure if it not null and
+                # send a 460 error code (looked through the error codes at
+                # developer.mozilla.org and chose one that is not used)
+                new_question = body.get("question", None)
+                if new_question is None:
+                    abort(422)
+
+                new_answer = body.get("answer", None)
+                if new_answer is None:
+                    abort(422)
+
+                new_difficulty = body.get("difficulty", None)
+                if new_difficulty is None:
+                    abort(422)
+
+                new_category = body.get("category", None)
+                if new_category is None:
+                    abort(422)
+
+                if Question.query.filter(Question.question == new_question).one_or_none() != None:
+                    abort(422)
+
+                newQuestion = Question(
+                    question=new_question,
+                    answer=new_answer,
+                    difficulty=new_difficulty,
+                    category=new_category
+                )
+
+                newQuestion.insert
+
+                return jsonify({
+                    'success': True,
+                })
+
+        except:
+            abort(422)
 
     """
     @TODO:
@@ -236,9 +254,39 @@ def create_app(test_config=None):
     one question at a time is displayed, the user is allowed to answer
     and shown whether they were correct or not.
     """
+    @app.route("/quizzes", methods=['GET'])
+    def get_question_for_quiz():
 
+        body = request.get_json()
+        previousQuestions = body.get("previous_questions", None)
+        # print("\nprevious questions: ", previousQuestions)
+        if previousQuestions is None:
+            abort(400)
+
+        quiz_category = body.get("quiz_category", None)
+        # print("\Quiz category: ", quiz_category)
+        if quiz_category is None:
+            abort(400)
+
+        category_id = Category.query.filter(Category.type == quiz_category)
+        if category_id is None:
+            abort(400)
+
+        nextQuestion = Question.query.filter(
+            ~Question.id.in_(previousQuestions)).first()
+
+        # print("next question: ", nextQuestion.format())
+        if nextQuestion == None:
+            return jsonify({
+                'success': False,
+                'message': "End of questions"
+            })
+
+        return jsonify({
+            'success': True,
+            'question': nextQuestion.format()
+        })
     """
-    @TODO:
     Create error handlers for all expected errors
     including 404 and 422.
     """
