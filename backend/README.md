@@ -115,8 +115,8 @@ Request Body:
 
 ```json
 {
-    'previous_questions': [1, 4, 20, 15]
-    'quiz_category': 'History'
+  "previous_questions": [1, 4, 20, 15],
+  "quiz_category": "History"
 }
 ```
 
