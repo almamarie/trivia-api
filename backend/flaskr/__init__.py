@@ -280,12 +280,19 @@ def create_app(test_config=None):
 
         print(quiz_category)
 
-        categoryId = quiz_category['id']
-        if categoryId is None:
-            abort(400)
+        # The frontend sends quiz_category as {'type'='click', 'id'=0}
+        # whenever it wast all questions so I am using this if-else statement
+        # to cater for that
+        if quiz_category['type'] == 'click':
+            nextQuestion = Question.query.filter(~Question.id.in_(
+                previousQuestions)).first()
 
-        nextQuestion = Question.query.filter(~Question.id.in_(
-            previousQuestions), Question.category == categoryId).first()
+        else:
+            categoryId = quiz_category['id']
+            if categoryId is None:
+                abort(400)
+            nextQuestion = Question.query.filter(~Question.id.in_(
+                previousQuestions), Question.category == categoryId).first()
 
         if nextQuestion == None:
             return jsonify({
