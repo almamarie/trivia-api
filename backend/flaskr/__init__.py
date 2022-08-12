@@ -274,23 +274,24 @@ def create_app(test_config=None):
             abort(400)
 
         quiz_category = body.get("quiz_category", None)
-        # print("\Quiz category: ", quiz_category)                             the way the front end sends their data for quiz_category is different from the way you do yours. fix your test code.
+        # print("\Quiz category: ", quiz_category)
         if quiz_category is None:
             abort(400)
 
         print(quiz_category)
 
+        categoryId = quiz_category['id']
+        if categoryId is None:
+            abort(400)
+
         # The frontend sends quiz_category as {'type'='click', 'id'=0}
         # whenever it wast all questions so I am using this if-else statement
         # to cater for that
-        if quiz_category['type'] == 'click':
+        if categoryId == 0:
             nextQuestion = Question.query.filter(~Question.id.in_(
                 previousQuestions)).first()
 
         else:
-            categoryId = quiz_category['id']
-            if categoryId is None:
-                abort(400)
             nextQuestion = Question.query.filter(~Question.id.in_(
                 previousQuestions), Question.category == categoryId).first()
 
