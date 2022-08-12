@@ -103,12 +103,9 @@ def create_app(test_config=None):
 
         categories = generate_categories()
 
-        # print("jiberrish", categories[currentQuestions[0]['category']])
-        # print("\n\nCurrent Category: ", categories)
         # generate the current category
         currentCategory = categories[currentQuestions[0]['category']]
 
-        # print(currentCategory)
         return jsonify({
             'success': True,
             'questions': currentQuestions,
@@ -286,16 +283,6 @@ def create_app(test_config=None):
         categoryId = quiz_category['id']
         if categoryId is None:
             abort(400)
-        # category_id = quiz_category.id
-        # print("\n\n\ncategory ID:", category_id)
-        # category_id = Category.query.filter(
-        #     Category.type == quiz_category).one_or_none()
-        # if category_id is None:
-        #     abort(400)
-        # print("category ID:", category_id)
-
-        # nextQuestion = Question.query.filter(
-        #     ~Question.id.in_(previousQuestions)).first()
 
         nextQuestion = Question.query.filter(~Question.id.in_(
             previousQuestions), Question.category == categoryId).first()
@@ -341,6 +328,14 @@ def create_app(test_config=None):
             jsonify({"success": False, "error": 405,
                     "message": "method not allowed"}),
             405,
+        )
+
+    @app.errorhandler(500)
+    def server_error(error):
+        return (
+            jsonify({"success": False, "error": 500,
+                    "message": "server error"}),
+            500,
         )
 
 # Tried creating new status codes but got errors
